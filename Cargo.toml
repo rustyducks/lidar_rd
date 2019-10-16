@@ -1,0 +1,20 @@
+[package]
+name = "lidar_rd"
+version = "0.1.0"
+authors = ["Fabien-B <fabien.bonneval@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "lidar_rd"
+path = "src/lib.rs"
+
+[[bin]]
+name = "xv11_decoder"
+path = "src/main.rs"
+
+
+[dependencies]
+lazy_static = "1.4.0"
+serial = "0.4.0"
