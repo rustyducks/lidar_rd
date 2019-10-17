@@ -1,6 +1,6 @@
 # Lidar RD
 
-This library contains trait for lidar handling, as well as implementation for the Neato XV11 and soon for the Hokuyo UST-05-LN.
+This library contains trait for lidar handling, as well as implementation for the Neato XV11 and the Hokuyo UST-05-LN.
 
 **How to use it ?**
 

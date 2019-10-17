@@ -16,5 +16,6 @@ path = "src/main.rs"
 
 
 [dependencies]
-lazy_static = "1.4.0"
+regex = "1.1.9"
 serial = "0.4.0"
+bufstream = "0.1.4"
