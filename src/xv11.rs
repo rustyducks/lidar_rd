@@ -238,9 +238,11 @@ fn decode_data(angle: usize, data: &[u8]) -> Option<Sample> {
     let warning = (data[1] & 0b01000000) != 0;
     let strength = ((data[3] as u16) << 8) | data[2] as u16;
 
+    let angle = ((angle as f64) - 180.0).to_radians();
+
     if !invalid && !warning {
         Some(Sample {
-            angle: angle as f64,
+            angle,
             distance,
             quality: strength,
         })
