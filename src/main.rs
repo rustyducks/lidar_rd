@@ -8,17 +8,17 @@ fn main() {
     l.start();
 
     // iterator style, so class but be carefull : infinite iterator !
-    for scan in l { 
+    for scan in l.iter() {
         let txt = scan.iter().map(|s| s.to_string()).collect::<Vec<_>>().join("\n");
-        println!("speed: {}\n{}\n\n", XV11::get_lidar_speed(), txt);
+        println!("speed: {}\n{}\n\n", l.get_lidar_speed(), txt);
     }
 
 
 
     // loop {
-    //     if let Some(samples) = XV11::get_scan() {
+    //     if let Some(samples) = l.get_scan() {
     //         let txt = samples.iter().map(|s| s.to_string()).collect::<Vec<_>>().join("\n");
-    //         println!("speed: {}", XV11::get_lidar_speed());
+    //         println!("speed: {}", l.get_lidar_speed());
     //         println!("{}\n\n", txt);
     //     }
     // }

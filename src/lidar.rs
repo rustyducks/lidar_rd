@@ -14,7 +14,7 @@ impl fmt::Display for Sample {
 }
 
 pub trait Lidar {
-    fn get_scan() -> Option<Vec<Sample>>;
+    fn get_scan(&self) -> Option<Vec<Sample>>;
     fn start(&mut self);
     fn stop(&self);
 }
