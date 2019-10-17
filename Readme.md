@@ -21,7 +21,9 @@ fn main() {
     l.start();
 
     for scan in l.iter() {
-        let txt = scan.iter().map(|s| s.to_string()).collect::<Vec<_>>().join("\n");
+        let txt = scan.iter()
+            .filter_map(|x| x.as_ref())
+            .map(|s| s.to_string()).collect::<Vec<_>>().join("\n");
         println!("speed: {}\n{}\n\n", l.get_lidar_speed(), txt);
     }
     

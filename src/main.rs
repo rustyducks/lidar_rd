@@ -9,17 +9,18 @@ fn main() {
 
     // iterator style, so class but be carefull : infinite iterator !
     for scan in l.iter() {
-        let txt = scan.iter().map(|s| s.to_string()).collect::<Vec<_>>().join("\n");
+        let txt = scan.iter()
+            .filter_map(|x| x.as_ref())
+            .map(|s| s.to_string()).collect::<Vec<_>>().join("\n");
         println!("speed: {}\n{}\n\n", l.get_lidar_speed(), txt);
     }
 
-
-
     // loop {
-    //     if let Some(samples) = l.get_scan() {
-    //         let txt = samples.iter().map(|s| s.to_string()).collect::<Vec<_>>().join("\n");
-    //         println!("speed: {}", l.get_lidar_speed());
-    //         println!("{}\n\n", txt);
+    //     if let Some(scan) = l.get_scan() {
+    //         let txt = scan.iter()
+    //             .filter_map(|x| x.as_ref())
+    //             .map(|s| s.to_string()).collect::<Vec<_>>().join("\n");
+    //         println!("speed: {}\n{}\n\n", l.get_lidar_speed(), txt);
     //     }
     // }
 

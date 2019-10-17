@@ -22,7 +22,7 @@ pub struct XV11 {
     }
 
 struct XV11Inner {
-    scan: Mutex<Box<Option<Vec<Sample>>>>,
+    scan: Mutex<Box<Option<Vec<Option<Sample>>>>>,
     lidar_speed: Mutex<f64>,
     port_path: String,
 }
@@ -37,7 +37,7 @@ enum InitLevel {
 
 impl<'a> Iterator for XV11Iter<'a> {
 
-    type Item = Vec<Sample>;
+    type Item = Vec<Option<Sample>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -54,13 +54,13 @@ impl<'a> Iterator for XV11Iter<'a> {
 
 impl XV11Inner {
 
-    fn get_turn(&self) -> Option<Vec<Sample>> {
+    fn get_turn(&self) -> Option<Vec<Option<Sample>>> {
         let mut boxed_samples = self.scan.lock().unwrap();
         let bb = mem::replace(&mut *boxed_samples, Box::new(None));
         *bb
     }
 
-    fn set_turn(&self, b: Box<Option<Vec<Sample>>>) {
+    fn set_turn(&self, b: Box<Option<Vec<Option<Sample>>>>) {
         let mut boxed_samples = self.scan.lock().unwrap();
         *boxed_samples = b;
     }
@@ -101,20 +101,22 @@ impl XV11Inner {
                     f.read_exact(&mut buffer[2..])?;
                     init_level = InitLevel::Idle;
                     let (speed, mut samples) = decode_packet(buffer);
-                    let (a_min, a_max) = get_min_max(&samples);
                     
                     if let Some(speed) = speed {
                         self.set_lidar_speed(speed);
                     }
-                    
-                    if a_min < angle_max {  // new turn !
-                        angle_max = a_max;
-                        self.set_turn(Box::new(Some(turn)));
-                        turn = vec![];
-                        
+
+                    if let Some((a_min, a_max)) = get_min_max(&samples) {
+                        if a_min < angle_max {  // new turn !
+                            angle_max = a_max;
+                            self.set_turn(Box::new(Some(turn)));
+                            turn = vec![];
+                            
+                        }
+                        angle_max = angle_max.max(a_max);   
                     }
                     
-                    angle_max = angle_max.max(a_max);
+
 
                     turn.append(&mut samples);
 
@@ -160,7 +162,7 @@ impl XV11 {
 }
 
 impl Lidar for XV11 {
-    fn get_scan(&self) -> Option<Vec<Sample>> {
+    fn get_scan(&self) -> Option<Vec<Option<Sample>>> {
         //let local_self = ;
         self.inner.clone().read().unwrap().get_turn()
     }
@@ -202,17 +204,21 @@ impl Lidar for XV11 {
 
 
 
-fn get_min_max(samples: &Vec<Sample>) -> (f64, f64) {
-    let (mut min, mut max): (f64, f64) = (360.0, 0.0);
+fn get_min_max(samples: &Vec<Option<Sample>>) -> Option<(f64, f64)> {
+    let mut mimax: Option<(f64, f64)>= None;
     for sample in samples {
-        min = min.min(sample.angle);
-        max = min.max(sample.angle)
+        if let Some(sample) = sample {
+            mimax = match mimax {
+                Some((min, max)) => Some((min.min(sample.angle), max.max(sample.angle))),
+                None => Some((sample.angle, sample.angle))
+            };
+        }
     }
-    (min, max)
+    mimax
 }
 
 
-fn decode_packet(buffer: [u8; 22]) -> (Option<f64>, Vec<Sample>) {
+fn decode_packet(buffer: [u8; 22]) -> (Option<f64>, Vec<Option<Sample>>) {
     let computed_chk = checksum(&buffer[0..20]);
     let read_chk = (buffer[20] as u16) | ((buffer[21] as u16) << 8);
 
@@ -223,7 +229,7 @@ fn decode_packet(buffer: [u8; 22]) -> (Option<f64>, Vec<Sample>) {
 
         let base_angle = index as usize * 4;
 
-        let samples = (0..4).filter_map(|i| {
+        let samples = (0..4).map(|i| {
             let data = &buffer[4*i..4*(i+1)];
             decode_data(base_angle + i, data)
         }).collect();
@@ -231,7 +237,7 @@ fn decode_packet(buffer: [u8; 22]) -> (Option<f64>, Vec<Sample>) {
         (Some(speed), samples)
 
     } else {
-        (None, vec![])
+        (None, vec![None, None, None, None])
     }
 
 }
