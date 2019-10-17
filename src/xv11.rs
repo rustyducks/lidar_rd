@@ -22,7 +22,8 @@ pub struct XV11 {
     }
 
 struct XV11Inner {
-    
+    scan: Mutex<Box<Option<Vec<Sample>>>>,
+    lidar_speed: Mutex<f64>,
     port_path: String,
 }
 
@@ -32,18 +33,6 @@ enum InitLevel {
     Started,
     Reading
 }
-
-
-
-lazy_static! {
-    static ref TURN: Mutex<Box<Option<Vec<Sample>>>> = Mutex::new(Box::new(None));
-}
-
-lazy_static! {
-    static ref LIDAR_SPEED: Mutex<f64> = Mutex::new(0.0);
-}
-
-
 
 
 impl<'a> Iterator for XV11Iter<'a> {
@@ -66,22 +55,22 @@ impl<'a> Iterator for XV11Iter<'a> {
 impl XV11Inner {
 
     fn get_turn(&self) -> Option<Vec<Sample>> {
-        let mut boxed_samples = TURN.lock().unwrap();
+        let mut boxed_samples = self.scan.lock().unwrap();
         let bb = mem::replace(&mut *boxed_samples, Box::new(None));
         *bb
     }
 
     fn set_turn(&self, b: Box<Option<Vec<Sample>>>) {
-        let mut boxed_samples = TURN.lock().unwrap();
+        let mut boxed_samples = self.scan.lock().unwrap();
         *boxed_samples = b;
     }
 
     fn get_lidar_speed(&self) -> f64 {
-        *LIDAR_SPEED.lock().unwrap()
+        *self.lidar_speed.lock().unwrap()
     }
 
     fn set_lidar_speed(&self, speed: f64) {
-        *LIDAR_SPEED.lock().unwrap() = speed;
+        *self.lidar_speed.lock().unwrap() = speed;
     }
 
     fn read_xv11(&self, f: &mut dyn Read, rx: mpsc::Receiver<()>) -> io::Result<()> {
@@ -151,6 +140,8 @@ impl XV11 {
         XV11 {
             inner: Arc::new(RwLock::new(XV11Inner {
                 port_path: port_path.to_string(),
+                scan: Mutex::new(Box::new(None)),
+                lidar_speed: Mutex::new(0.0),
             })),
             tx: None,
         }

@@ -1,5 +1,3 @@
-#[macro_use]
-extern crate lazy_static;
 
 pub mod lidar;
 pub mod xv11;
