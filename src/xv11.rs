@@ -19,6 +19,7 @@ pub struct XV11Iter<'a> {
 pub struct XV11 {
     inner: Arc<RwLock<XV11Inner>>,
     tx: Option<mpsc::Sender<()>>,
+    started: bool,
     }
 
 struct XV11Inner {
@@ -40,12 +41,15 @@ impl<'a> Iterator for XV11Iter<'a> {
     type Item = Vec<Option<Sample>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some(scan) = self.inner.get_scan() {
-                return Some(scan);
+        if self.inner.started {
+            loop {
+                if let Some(scan) = self.inner.get_scan() {
+                    return Some(scan);
+                }
             }
+        } else {
+            None
         }
-
     }
 
 }
@@ -146,6 +150,7 @@ impl XV11 {
                 lidar_speed: Mutex::new(0.0),
             })),
             tx: None,
+            started : false,
         }
     }
 
@@ -193,6 +198,8 @@ impl Lidar for XV11 {
             //read_xv11(&mut f, rx).expect("XV11 reading failed !");
             println!("Stopped !");
         });
+
+        self.started = true;
     }
 
     fn stop(&self) {
