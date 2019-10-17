@@ -1,6 +1,5 @@
 use std::fmt;
 
-
 pub struct Sample {
     pub angle: f64,
     pub distance: u16,
