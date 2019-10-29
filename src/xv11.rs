@@ -19,6 +19,7 @@ pub struct XV11 {
     inner: Arc<RwLock<XV11Inner>>,
     tx: Option<mpsc::Sender<()>>,
     started: bool,
+    join_handle: Option<thread::JoinHandle<()>>,
 }
 
 struct XV11Inner {
@@ -138,6 +139,7 @@ impl XV11 {
             })),
             tx: None,
             started: false,
+            join_handle: None,
         }
     }
 
@@ -176,21 +178,25 @@ impl Lidar for XV11 {
 
         port.set_timeout(Duration::from_millis(500)).unwrap();
 
-        thread::spawn(move || {
+        self.join_handle = Some(thread::spawn(move || {
             local_self
                 .read()
                 .unwrap()
                 .read_xv11(&mut port, rx)
                 .expect("XV11 reading failed !");
             println!("Stopped !");
-        });
+        }));
 
         self.started = true;
     }
 
-    fn stop(&self) {
+    fn stop(&mut self) {
         if let Some(tx) = &self.tx {
             let _ = tx.send(());
+        }
+        if let Some(handle) = self.join_handle.take() {
+            handle.join().expect("failed to join thread");
+            self.join_handle = None;
         }
     }
 }

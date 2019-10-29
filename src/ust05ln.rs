@@ -18,6 +18,7 @@ pub struct UST05LN {
     inner: Arc<RwLock<UST05LNInner>>,
     tx: Option<mpsc::Sender<()>>,
     started: bool,
+    join_handle: Option<thread::JoinHandle<()>>,
 }
 
 struct UST05LNInner {
@@ -56,21 +57,26 @@ impl Lidar for UST05LN {
 
         port.set_timeout(Duration::from_millis(500)).unwrap();
 
-        thread::spawn(move || {
+        self.join_handle = Some(thread::spawn(move || {
             local_self
                 .read()
                 .unwrap()
                 .read_ust(&mut port, rx)
                 .expect("XV11 reading failed !");
             println!("Stopped !");
-        });
+        }));
 
         self.started = true;
     }
 
-    fn stop(&self) {
+    fn stop(&mut self) {
         if let Some(tx) = &self.tx {
             let _ = tx.send(());
+        }
+
+        if let Some(handle) = self.join_handle.take() {
+            handle.join().expect("failed to join thread");
+            self.join_handle = None;
         }
     }
 }
@@ -101,6 +107,7 @@ impl UST05LN {
             })),
             tx: None,
             started: false,
+            join_handle: None,
         }
     }
 
