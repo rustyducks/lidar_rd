@@ -5,6 +5,7 @@ use std::io;
 use std::io::BufRead;
 use std::io::{Read, Write};
 use std::mem;
+use std::error::Error;
 use std::sync::mpsc::{self, TryRecvError};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -36,14 +37,14 @@ impl Lidar for UST05LN {
         self.inner.clone().read().unwrap().get_turn()
     }
 
-    fn start(&mut self) {
+    fn start(&mut self) -> Result<(), Box<dyn Error>> {
         let local_self = self.inner.clone();
 
         let (tx, rx) = mpsc::channel();
 
         self.tx = Some(tx.clone());
 
-        let mut port = serial::open(&local_self.read().unwrap().port_path).unwrap();
+        let mut port = serial::open(&local_self.read().unwrap().port_path)?;
 
         port.reconfigure(&|settings| {
             settings.set_baud_rate(serial::Baud115200)?;
@@ -67,6 +68,8 @@ impl Lidar for UST05LN {
         }));
 
         self.started = true;
+
+        Ok(())
     }
 
     fn stop(&mut self) {

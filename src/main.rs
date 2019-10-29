@@ -1,8 +1,9 @@
 use lidar_rd::{Lidar, Sample, XV11};
+use std::error::Error;
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let mut l = XV11::new("/dev/ttyUSB0");
-    l.start();
+    l.start()?;
 
     // iterator style, so class but be carefull : infinite iterator !
     for scan in l.iter() {
@@ -14,6 +15,8 @@ fn main() {
             .join("\n");
         println!("speed: {}\n{}\n\n", l.get_lidar_speed(), txt);
     }
+
+    Ok(())
 
     // loop {
     //     if let Some(scan) = l.get_scan() {

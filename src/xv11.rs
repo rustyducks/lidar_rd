@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
+use std::error::Error;
 
 use crate::lidar::{Lidar, Sample};
 
@@ -157,7 +158,7 @@ impl Lidar for XV11 {
         self.inner.clone().read().unwrap().get_turn()
     }
 
-    fn start(&mut self) {
+    fn start(&mut self) -> Result<(), Box<dyn Error>> {
         let local_self = self.inner.clone();
 
         let (tx, rx) = mpsc::channel();
@@ -188,6 +189,8 @@ impl Lidar for XV11 {
         }));
 
         self.started = true;
+
+        Ok(())
     }
 
     fn stop(&mut self) {

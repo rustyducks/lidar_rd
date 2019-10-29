@@ -1,4 +1,5 @@
 use std::fmt;
+use std::error::Error;
 
 pub struct Sample {
     pub angle: f64,
@@ -14,6 +15,6 @@ impl fmt::Display for Sample {
 
 pub trait Lidar {
     fn get_scan(&self) -> Option<Vec<Option<Sample>>>;
-    fn start(&mut self);
+    fn start(&mut self) -> Result<(), Box<dyn Error>>;
     fn stop(&mut self);
 }
