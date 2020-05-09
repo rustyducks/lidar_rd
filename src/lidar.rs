@@ -1,7 +1,7 @@
 use std::fmt;
 use std::error::Error;
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Sample {
     pub angle: f64,
     pub distance: u16,
