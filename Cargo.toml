@@ -19,3 +19,5 @@ path = "src/main.rs"
 regex = "1.1.9"
 serial = "0.4.0"
 bufstream = "0.1.4"
+serialport = "4.0.1"
+

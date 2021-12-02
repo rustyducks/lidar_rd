@@ -8,11 +8,32 @@ pub struct Sample {
     pub quality: u16,
 }
 
+pub struct Turn {
+    pub samples: Vec<Option<Sample>>
+}
+
 impl fmt::Display for Sample {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{},{}", self.angle, self.distance, self.quality)
     }
 }
+
+impl Turn {
+    pub fn new() -> Turn{
+        Turn {
+            //samples: Vec::new(),
+            samples: vec![None, None, None],
+        }
+    }
+}
+
+impl fmt::Display for Turn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "turn")
+    }
+}
+
+
 
 pub trait Lidar {
     fn get_scan(&self) -> Option<Vec<Option<Sample>>>;
