@@ -10,7 +10,7 @@ use std::thread;
 use std::io;
 
 
-const crcTable: [u8; 256] = 
+const CRC_TABLE: [u8; 256] = 
 [ 
     0x00, 0x4d, 0x9a, 0xd7, 0x79, 0x34, 0xe3, 
     0xae, 0xf2, 0xbf, 0x68, 0x25, 0x8b, 0xc6, 0x11, 0x5c, 0xa9, 0xe4, 0x33, 
@@ -110,11 +110,6 @@ enum RcvState {
     WaitChk,
 }
 
-struct LD06Header {
-    data_len: usize,
-
-}
-
 struct LD06Transport {
     frame: Vec<u8>,
     buffer: Vec<u8>,
@@ -138,7 +133,7 @@ impl LD06Transport {
 
         f.iter().fold(0, |crc, x| {
             let index = (crc ^ x) & 0xff;
-            let crc = crcTable[index as usize];
+            let crc = CRC_TABLE[index as usize];
             crc
         })
     }
@@ -150,7 +145,7 @@ impl LD06Transport {
         let start_angle = u16le_from_slice(&self.frame[4..6]) as f64 * 0.01;
 
         let end_angle = u16le_from_slice(&self.frame[6+self.nb_points*3..8+self.nb_points*3]) as f64 * 0.01;
-        let timestamp = u16le_from_slice(&self.frame[8+self.nb_points*3..10+self.nb_points*3]);
+        let _timestamp = u16le_from_slice(&self.frame[8+self.nb_points*3..10+self.nb_points*3]);
 
         let step = if end_angle < start_angle {
             (end_angle + 360. - start_angle) / (self.nb_points - 1) as f64
@@ -235,7 +230,7 @@ fn ld06_run(mut serial: Box<dyn SerialPort>, rx_cmd: Receiver<()>, data: Arc<Mut
         match serial.read(&mut buffer) {
             Ok(nb) => {
                 for c in &buffer[0..nb] {
-                    if let Some((speed, samples)) = transport.put(*c) {
+                    if let Some((_speed, samples)) = transport.put(*c) {
                         for s in samples {
                             if s.angle < turn.last_angle() {
                                 // a turn is complete, update LD06 last turn
