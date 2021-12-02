@@ -10,7 +10,7 @@ use std::thread;
 use std::time::Duration;
 use std::error::Error;
 
-use crate::lidar::{Lidar, Sample};
+use crate::lidar::{Lidar, Sample, impl_iterator};
 
 pub struct XV11Iter<'a> {
     inner: &'a XV11,
@@ -202,6 +202,10 @@ impl Lidar for XV11 {
             self.join_handle = None;
         }
     }
+
+    fn is_running(&self) -> bool {
+        self.started
+    }
 }
 
 fn get_min_max(samples: &Vec<Option<Sample>>) -> Option<(f64, f64)> {
@@ -272,3 +276,5 @@ fn checksum(buffer: &[u8]) -> u16 {
 
     checksum as u16
 }
+
+impl_iterator!(XV11);

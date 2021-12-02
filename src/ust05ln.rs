@@ -13,7 +13,7 @@ use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
 
-use crate::lidar::{Lidar, Sample};
+use crate::lidar::{Lidar, Sample, impl_iterator};
 
 pub struct UST05LN {
     inner: Arc<RwLock<UST05LNInner>>,
@@ -34,7 +34,7 @@ pub struct UST05LNIter<'a> {
 
 impl Lidar for UST05LN {
     fn get_scan(&self) -> Option<Vec<Option<Sample>>> {
-        self.inner.clone().read().unwrap().get_turn()
+        self.inner.read().unwrap().get_turn()
     }
 
     fn start(&mut self) -> Result<(), Box<dyn Error>> {
@@ -53,10 +53,9 @@ impl Lidar for UST05LN {
             settings.set_stop_bits(serial::Stop1);
             settings.set_flow_control(serial::FlowNone);
             Ok(())
-        })
-        .unwrap();
+        })?;
 
-        port.set_timeout(Duration::from_millis(500)).unwrap();
+        port.set_timeout(Duration::from_millis(500))?;
 
         self.join_handle = Some(thread::spawn(move || {
             local_self
@@ -81,6 +80,10 @@ impl Lidar for UST05LN {
             handle.join().expect("failed to join thread");
             self.join_handle = None;
         }
+    }
+
+    fn is_running(&self) -> bool {
+        self.started
     }
 }
 
@@ -268,3 +271,5 @@ impl UST05LNInner {
         }
     }
 }
+
+impl_iterator!(UST05LN);
