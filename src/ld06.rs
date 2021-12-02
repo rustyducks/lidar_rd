@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 //use std::sync::RwLock;
 use std::mem;
-use crate::lidar::{Lidar, Sample, Turn, impl_iterator};
+use crate::lidar::{Lidar, Sample, Turn, impl_iterator, impl_drop};
 use std::thread;
 use std::io;
 
@@ -62,7 +62,7 @@ impl Lidar for LD06 {
         self.tx_cmd = Some(tx_cmd.clone());
 
         let port = serialport::new(&self.port, 230_400)
-            .timeout(Duration::from_millis(1))
+            .timeout(Duration::from_millis(3))
             .open()?;
 
         let adata = self.data.clone();
@@ -90,6 +90,7 @@ impl Lidar for LD06 {
         }
     }
 }
+
 
 impl LD06 {
     pub fn new(port: &str) -> LD06 {
@@ -133,40 +134,55 @@ impl LD06Transport {
 
     fn checksum(&self)  -> u8 
     {
-        // let mut crc: u8 = 0;
+        let (_, f) = self.frame.split_last().unwrap();
 
-        let ret = self.frame.iter().fold(0, |crc, x| {
+        f.iter().fold(0, |crc, x| {
             let index = (crc ^ x) & 0xff;
-            crcTable[index as usize]
-        });
-
-        // for i in 0..self.frame.len() {
-        //     let index = (crc ^ self.frame[i]) & 0xff;
-        //     crc = crcTable[index as usize];
-        //     println!("crc: {} {}", crc, index);
-        // }
-        
-        return ret;
+            let crc = crcTable[index as usize];
+            crc
+        })
     }
     
 
     // TODO change return type to a "data type", and write parse code
-    fn parse(&self) -> bool {
-        let speed = u16le_from_slice(&self.frame[2..4]);
+    fn parse(&self) -> (f64, Vec<Sample>) {
+        let speed = u16le_from_slice(&self.frame[2..4]) as f64 / 360.0;
         let start_angle = u16le_from_slice(&self.frame[4..6]) as f64 * 0.01;
 
         let end_angle = u16le_from_slice(&self.frame[6+self.nb_points*3..8+self.nb_points*3]) as f64 * 0.01;
         let timestamp = u16le_from_slice(&self.frame[8+self.nb_points*3..10+self.nb_points*3]);
 
-        println!("{:.2}Hz {:.2}->{:.2}  {}", speed as f64/360.0, start_angle, end_angle, timestamp);
-        true
+        let step = if end_angle < start_angle {
+            (end_angle + 360. - start_angle) / (self.nb_points - 1) as f64
+        } else {
+            (end_angle - start_angle) / (self.nb_points - 1) as f64
+        };
+
+        let samples = self.frame[6..6+self.nb_points*3]
+            .chunks(3)
+            .enumerate()
+            .map(|(i, chuck)| {
+                let angle = start_angle + step*(i as f64);
+                let angle = if angle > 360. {angle - 360.} else {angle};
+                let distance = u16le_from_slice(&chuck[0..2]);
+                let confidence = chuck[2];
+                Sample {
+                    angle,
+                    distance,
+                    quality: confidence as u16
+                }
+        }).collect::<Vec<_>>();
+
+        (speed, samples)
     }
 
-    fn put(&mut self, c: u8) -> Option<bool> {
+    fn put(&mut self, c: u8) -> Option<(f64, Vec<Sample>)> {
         self.buffer.push(c);
         match self.rcv_state {
             RcvState::WaitStart => {
+                self.buffer.clear();
                 if c == 0x54 {
+                    self.buffer.push(0x54);
                     self.rcv_state = RcvState::WaitLen;
                 } else {
                     self.buffer.clear();
@@ -174,9 +190,8 @@ impl LD06Transport {
             },
             RcvState::WaitLen => {
                 self.nb_points = c as usize & 0x1F;
-                let nb_bytes = 3 * self.nb_points + 9;
+                let nb_bytes = 3 * self.nb_points + 8;
                 self.rcv_state = RcvState::GetPayload(nb_bytes);
-                
             },
             RcvState::GetPayload(mut n) => {
                 n -= 1;
@@ -189,20 +204,18 @@ impl LD06Transport {
                 //if c == self.checksum() {
                 //  TODO checksum code
 
-                // remove the checksum from the buffer
-                self.buffer.pop();
-
                 self.rcv_state = RcvState::WaitStart;
 
                 // swap buffer and frame to analyse the frame, and clear the buffer.
                 mem::swap(&mut self.buffer, &mut self.frame);
                 self.buffer.clear();
-                println!("chk: {} {}", c, self.checksum());
-                if c == c {
+
+                let calc_check = self.checksum();
+                if c == calc_check {
                     //return None;
                     return Some(self.parse());
                 } else {
-                    println!("checksum failed: {} {}", c, self.checksum());
+                    println!("checksum failed: {} {}", c, calc_check);
                 }
             },
         };
@@ -213,15 +226,28 @@ impl LD06Transport {
 fn ld06_run(mut serial: Box<dyn SerialPort>, rx_cmd: Receiver<()>, data: Arc<Mutex<Box<Option<Turn>>>>) {
     let mut transport = LD06Transport::new();
 
+    let mut turn = Turn::new();
+
     loop {
         thread::sleep(Duration::from_micros(10));
 
-        let mut buffer: [u8; 50] = [0; 50];
+        let mut buffer: [u8; 47] = [0; 47];
         match serial.read(&mut buffer) {
             Ok(nb) => {
                 for c in &buffer[0..nb] {
-                    if let Some(_data) = transport.put(*c) {
+                    if let Some((speed, samples)) = transport.put(*c) {
+                        for s in samples {
+                            if s.angle < turn.last_angle() {
+                                // a turn is complete, update LD06 last turn
+                                let mut boxed_turn = data.lock().unwrap();
+                                *boxed_turn = Box::new(Some(turn));
 
+                                // create the new current turn
+                                turn = Turn::new();
+                            }
+
+                            turn.push(s);
+                        }
                     }
                 }
 ;
@@ -230,14 +256,6 @@ fn ld06_run(mut serial: Box<dyn SerialPort>, rx_cmd: Receiver<()>, data: Arc<Mut
             Err(e) => eprintln!("{:?}", e),
 
         };
-
-
-
-        let t = Turn::new();
-
-        //let mut boxed_turn = data.lock().unwrap();
-        //*boxed_turn = Box::new(Some(t));
-
 
         match rx_cmd.try_recv() {
             Ok(_) | Err(TryRecvError::Disconnected) => {
@@ -252,3 +270,4 @@ fn ld06_run(mut serial: Box<dyn SerialPort>, rx_cmd: Receiver<()>, data: Arc<Mut
 }
 
 impl_iterator!(LD06);
+impl_drop!(LD06);
